@@ -67,9 +67,19 @@ class Version1X extends AbstractSocketIO
             return;
         }
 
-        $this->handshake();
+        if (($this->options['transport'] ?? '') !== 'websocket') {
+            $this->handshake();
+        }
         $this->connectNamespace();
         $this->upgradeTransport();
+    }
+
+    protected function getTimeout()
+    {
+        if ($this->session) {
+            return $this->session->getTimeout();
+        }
+        return $this->options['timeout'] ?? null;
     }
 
     /** {@inheritDoc} */
@@ -211,7 +221,9 @@ class Version1X extends AbstractSocketIO
     protected function write($data)
     {
         $bytes = $this->stream->write($data);
-        $this->session->resetHeartbeat();
+        if ($this->session) {
+            $this->session->resetHeartbeat();
+        }
 
         // wait a little bit of time after this message was sent
         \usleep((int) $this->options['wait']);
@@ -272,7 +284,14 @@ class Version1X extends AbstractSocketIO
     protected function getPayload($data, $encoding = Encoder::OPCODE_TEXT)
     {
         $encoder = new Encoder($data, $encoding, true);
-        $encoder->setMaxPayload($this->session->maxPayload ? $this->session->maxPayload : $this->options['max_payload']);
+        if ($this->session && $this->session->maxPayload) {
+            $maxPayLoad = $this->session->maxPayload;
+        } else {
+            $maxPayLoad = $this->options['max_payload'];
+        }
+        if ($maxPayLoad) {
+            $encoder->setMaxPayload($maxPayLoad);
+        }
 
         return $encoder;
     }
@@ -450,12 +469,15 @@ class Version1X extends AbstractSocketIO
 
         $this->createSocket();
 
-        $uri = $this->getUri([
+        $query = [
             'EIO' => $this->options['version'],
             'transport' => $this->options['transport'],
             't' => Yeast::yeast(),
-            'sid' => $this->session->id,
-        ]);
+        ];
+        if ($this->session) {
+            $query['sid'] = $this->session->id;
+        }
+        $uri = $this->getUri($query);
         $payload = static::PROTO_MESSAGE . static::PACKET_CONNECT . $this->getAuthPayload();
 
         $this->stream->request($uri, ['Connection' => 'close'], ['method' => 'POST', 'payload' => $payload]);
@@ -494,12 +516,15 @@ class Version1X extends AbstractSocketIO
 
         $this->createSocket();
 
-        $uri = $this->getUri([
+        $query = [
             'EIO' => $this->options['version'],
             'transport' => $this->options['transport'],
             't' => Yeast::yeast(),
-            'sid' => $this->session->id,
-        ]);
+        ];
+        if ($this->session) {
+            $query['sid'] = $this->session->id;
+        }
+        $uri = $this->getUri($query);
 
         $sid = null;
         $this->stream->request($uri, ['Connection' => 'close']);
@@ -585,7 +610,7 @@ class Version1X extends AbstractSocketIO
         $this->logger->debug('Starting namespace connect');
 
         // set timeout based on handshake response
-        $this->options['timeout'] = $this->session->getTimeout();
+        $this->options['timeout'] = $this->getTimeout();
 
         $this->requestNamespace();
         $this->confirmNamespace();
@@ -606,7 +631,7 @@ class Version1X extends AbstractSocketIO
         $this->logger->debug('Starting websocket upgrade');
 
         // set timeout based on handshake response
-        $this->options['timeout'] = $this->session->getTimeout();
+        $this->options['timeout'] = $this->getTimeout();
 
         $this->createSocket();
 
@@ -614,8 +639,10 @@ class Version1X extends AbstractSocketIO
             'EIO' => $this->options['version'],
             'transport' => static::TRANSPORT_WEBSOCKET,
             't' => Yeast::yeast(),
-            'sid' => $this->session->id,
         ];
+        if ($this->session) {
+            $query['sid'] = $this->session->id;
+        }
 
         if ($this->options['version'] === 2 && $this->options['use_b64']) {
             $query['b64'] = 1;
@@ -665,7 +692,7 @@ class Version1X extends AbstractSocketIO
      */
     public function keepAlive()
     {
-        if ($this->options['version'] <= 3 && $this->session->needsHeartbeat()) {
+        if ($this->options['version'] <= 3 && $this->session && $this->session->needsHeartbeat()) {
             $this->logger->debug('Sending PING');
             $this->send(static::PROTO_PING);
         }
