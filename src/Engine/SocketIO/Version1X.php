@@ -74,6 +74,9 @@ class Version1X extends AbstractSocketIO
         $this->upgradeTransport();
     }
 
+    /**
+     * @return null|float
+     */
     protected function getTimeout()
     {
         if ($this->session) {
@@ -246,6 +249,23 @@ class Version1X extends AbstractSocketIO
             'transport' => static::TRANSPORT_POLLING,
             'max_payload' => 10e7,
         ];
+    }
+
+    /**
+     * @return array
+     */
+    protected function getQuery()
+    {
+        $query = [
+            'EIO' => $this->options['version'],
+            'transport' => $this->options['transport'],
+            't' => Yeast::yeast(),
+        ];
+        if ($this->session) {
+            $query['sid'] = $this->session->id;
+        }
+
+        return $query;
     }
 
     /**
@@ -469,15 +489,7 @@ class Version1X extends AbstractSocketIO
 
         $this->createSocket();
 
-        $query = [
-            'EIO' => $this->options['version'],
-            'transport' => $this->options['transport'],
-            't' => Yeast::yeast(),
-        ];
-        if ($this->session) {
-            $query['sid'] = $this->session->id;
-        }
-        $uri = $this->getUri($query);
+        $uri = $this->getUri($this->getQuery());
         $payload = static::PROTO_MESSAGE . static::PACKET_CONNECT . $this->getAuthPayload();
 
         $this->stream->request($uri, ['Connection' => 'close'], ['method' => 'POST', 'payload' => $payload]);
@@ -516,15 +528,7 @@ class Version1X extends AbstractSocketIO
 
         $this->createSocket();
 
-        $query = [
-            'EIO' => $this->options['version'],
-            'transport' => $this->options['transport'],
-            't' => Yeast::yeast(),
-        ];
-        if ($this->session) {
-            $query['sid'] = $this->session->id;
-        }
-        $uri = $this->getUri($query);
+        $uri = $this->getUri($this->getQuery());
 
         $sid = null;
         $this->stream->request($uri, ['Connection' => 'close']);
@@ -552,11 +556,7 @@ class Version1X extends AbstractSocketIO
 
         $this->createSocket();
 
-        $query = [
-            'EIO' => $this->options['version'],
-            'transport' => $this->options['transport'],
-            't' => Yeast::yeast(),
-        ];
+        $query = $this->getQuery();
         if ($this->options['use_b64']) {
             $query['b64'] = 1;
         }
@@ -635,15 +635,7 @@ class Version1X extends AbstractSocketIO
 
         $this->createSocket();
 
-        $query = [
-            'EIO' => $this->options['version'],
-            'transport' => static::TRANSPORT_WEBSOCKET,
-            't' => Yeast::yeast(),
-        ];
-        if ($this->session) {
-            $query['sid'] = $this->session->id;
-        }
-
+        $query = $this->getQuery();
         if ($this->options['version'] === 2 && $this->options['use_b64']) {
             $query['b64'] = 1;
         }
