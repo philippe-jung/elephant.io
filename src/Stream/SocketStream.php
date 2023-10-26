@@ -211,13 +211,13 @@ class SocketStream extends AbstractStream
 
         // wait for response
         $header = true;
-        $len = null;
+        $len = 4096;
         $this->logger->debug('Waiting for response!!!');
         while (true) {
             if (!$this->connected()) {
                 break;
             }
-            if ($content = $header ? fgets($this->handle) : fread($this->handle, (int) $len)) {
+            if ($content = $header ? fgets($this->handle) : fread($this->handle, $len)) {
                 $this->logger->debug(sprintf('Receive: %s', trim($content)));
                 if ($content === static::EOL && $header) {
                     if ($skip_body) {
