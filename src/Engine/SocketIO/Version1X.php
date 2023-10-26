@@ -254,13 +254,14 @@ class Version1X extends AbstractSocketIO
     /**
      * @return array
      */
-    protected function getQuery()
+    protected function getQuery(array $overrides = [])
     {
         $query = [
             'EIO' => $this->options['version'],
             'transport' => $this->options['transport'],
             't' => Yeast::yeast(),
         ];
+        $query = array_merge($query, $overrides);
         if ($this->session) {
             $query['sid'] = $this->session->id;
         }
@@ -635,7 +636,7 @@ class Version1X extends AbstractSocketIO
 
         $this->createSocket();
 
-        $query = $this->getQuery();
+        $query = $this->getQuery(['transport' => static::TRANSPORT_WEBSOCKET]);
         if ($this->options['version'] === 2 && $this->options['use_b64']) {
             $query['b64'] = 1;
         }
